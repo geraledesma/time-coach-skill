@@ -1,0 +1,47 @@
+{
+  "skill_name": "time-coach",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Hey, do a weekly review for me. Vault is at /Users/gera.ledesma/Documents/Claude/vault_personal, agent folder is agenda-manager. Use whatever data you can find in the log and trends files.",
+      "expected_output": "A weekly scorecard with █/░ bar charts, actuals vs goals per activity, flags (✅/🟢/🟡/🔴), catch-up recommendations, and a 2–3 sentence outlook. Ends with an offer to log the entry to log.md and update trends.md (does not write unilaterally).",
+      "files": [],
+      "assertions": [
+        "Output contains a bar chart using █ or ░ characters, or a markdown table of actuals vs goals",
+        "Output covers at least 5 of the 7 tracked activities: Job Search, EDHEC, AI Learning, Bancos y Sofipos, Bitcoin Insurance, Running, Lectura",
+        "Output uses at least two different flag symbols from ✅ 🟢 🟡 🔴",
+        "Output includes a catch-up or recovery recommendation for at least one activity below goal",
+        "Output ends with an offer to log the entry to log.md or update trends.md — does not write files unilaterally",
+        "Output reads vault data successfully — no 'file not found' or error message"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Show me the pending calibration proposals in my time-coach vault at /Users/gera.ledesma/Documents/Claude/vault_personal (agenda-manager folder). Walk me through each one and I'll approve or reject.",
+      "expected_output": "Reads wiki/trends.md, finds the ⚠️ Pending section, presents both proposals (Exercise TARGET_HIGH and Side Project MILESTONE_UNDEFINED) with current vs proposed values. Asks approve/reject/skip per proposal. Shows exact diff of what would be written. Does not write unilaterally.",
+      "files": [],
+      "assertions": [
+        "Output finds and presents the Exercise (🏃) TARGET_HIGH proposal from trends.md",
+        "Output shows current vs proposed values for the Exercise proposal (4 sessions/wk → 3, or equivalent)",
+        "Output finds and presents the second proposal (Side Project MILESTONE_UNDEFINED or equivalent)",
+        "Output asks the user for approve/reject/skip per proposal — does not apply changes unilaterally",
+        "Output shows a preview or diff of what would be written to objectives.md upon approval",
+        "Output processes proposals with analysis — does not just quote the raw file verbatim"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I want to lower my EDHEC Coursera weekly goal from 7h to 5h — it's been too hard to hit consistently and I keep missing it. Vault: /Users/gera.ledesma/Documents/Claude/vault_personal, agent: agenda-manager.",
+      "expected_output": "Reads objectives.md to verify current goal is 7h. Shows a full diff across all affected files (objectives.md §1, §2, runbook.md, CLAUDE.md). Asks for confirmation. If confirmed, flags milestone impact (May 29 → ~Jun 14). Appends calibration history entry to trends.md. Does not write without explicit yes.",
+      "files": [],
+      "assertions": [
+        "Output verifies the current EDHEC weekly goal from objectives.md (confirms 7h before accepting user's claim)",
+        "Output shows a clear before → after diff: weekly goal ≥7h → ≥5h",
+        "Output identifies and includes runbook.md and/or CLAUDE.md in the list of files to update",
+        "Output asks for explicit confirmation before applying any changes",
+        "Output shows or offers to append a calibration history entry to wiki/trends.md",
+        "Output does NOT actually modify any files — this is a read-only eval run"
+      ]
+    }
+  ]
+}
