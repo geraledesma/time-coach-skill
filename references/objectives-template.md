@@ -11,11 +11,21 @@ updated: YYYY-MM-DD
 
 ## §1 · Weekly Targets
 
-| Activity | Weekly Goal | Notes |
-|---|---|---|
-| [Activity 1] | ≥Xh | |
-| [Activity 2] | ≥Xh | |
-| [Activity 3] | ≥X sessions | |
+| Activity | Type | Weekly Goal | Tracking | Notes |
+|---|---|---|---|---|
+| [Activity 1] | must-do | ≥Xh | hours | |
+| [Activity 2] | habit | ≥X sessions | sessions | |
+| [Activity 3] | habit | ≥Xh | hours | |
+| [Activity 4] | project | ≥Xh | completion:200pages | e.g. book — tracks to a finish line |
+
+> **Type column values:** `must-do` · `habit` · `project`
+>
+> **Tracking column values:**
+> - `hours` (default) — standard recurring-hours goal
+> - `sessions` — session-count goal (gym, runs, etc.)
+> - `completion:Xunits` — project with a finish line: `completion:200pages`, `completion:12modules`
+>
+> Projects must also have a target date in §3 Quarterly Goals or §4 Project Milestones.
 
 ---
 

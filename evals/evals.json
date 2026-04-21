@@ -3,12 +3,12 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Hey, do a weekly review for me. Vault is at /Users/gera.ledesma/Documents/Claude/vault_personal, agent folder is agenda-manager. Use whatever data you can find in the log and trends files.",
+      "prompt": "Hey, do a weekly review for me. Vault is at /Users/you/Documents/Claude/vault_personal, agent folder is agenda-manager. Use whatever data you can find in the log and trends files.",
       "expected_output": "A weekly scorecard with █/░ bar charts, actuals vs goals per activity, flags (✅/🟢/🟡/🔴), catch-up recommendations, and a 2–3 sentence outlook. Ends with an offer to log the entry to log.md and update trends.md (does not write unilaterally).",
       "files": [],
       "assertions": [
         "Output contains a bar chart using █ or ░ characters, or a markdown table of actuals vs goals",
-        "Output covers at least 5 of the 7 tracked activities: Job Search, EDHEC, AI Learning, Bancos y Sofipos, Bitcoin Insurance, Running, Lectura",
+        "Output covers tracked activities read from objectives.md — scorecard contains at least 5 activities with progress bars and flags",
         "Output uses at least two different flag symbols from ✅ 🟢 🟡 🔴",
         "Output includes a catch-up or recovery recommendation for at least one activity below goal",
         "Output ends with an offer to log the entry to log.md or update trends.md — does not write files unilaterally",
@@ -17,7 +17,7 @@
     },
     {
       "id": 2,
-      "prompt": "Show me the pending calibration proposals in my time-coach vault at /Users/gera.ledesma/Documents/Claude/vault_personal (agenda-manager folder). Walk me through each one and I'll approve or reject.",
+      "prompt": "Show me the pending calibration proposals in my time-coach vault at /Users/you/Documents/Claude/vault_personal (agenda-manager folder). Walk me through each one and I'll approve or reject.",
       "expected_output": "Reads wiki/trends.md, finds the ⚠️ Pending section, presents both proposals (Exercise TARGET_HIGH and Side Project MILESTONE_UNDEFINED) with current vs proposed values. Asks approve/reject/skip per proposal. Shows exact diff of what would be written. Does not write unilaterally.",
       "files": [],
       "assertions": [
@@ -31,16 +31,44 @@
     },
     {
       "id": 3,
-      "prompt": "I want to lower my EDHEC Coursera weekly goal from 7h to 5h — it's been too hard to hit consistently and I keep missing it. Vault: /Users/gera.ledesma/Documents/Claude/vault_personal, agent: agenda-manager.",
-      "expected_output": "Reads objectives.md to verify current goal is 7h. Shows a full diff across all affected files (objectives.md §1, §2, runbook.md, CLAUDE.md). Asks for confirmation. If confirmed, flags milestone impact (May 29 → ~Jun 14). Appends calibration history entry to trends.md. Does not write without explicit yes.",
+      "prompt": "I want to lower my Online Course weekly goal from 7h to 5h — it's been too hard to hit consistently and I keep missing it. Vault: /Users/you/Documents/Claude/vault_personal, agent: agenda-manager.",
+      "expected_output": "Reads objectives.md to verify current goal is 7h. Shows a full diff across all affected files (objectives.md §1, §2, runbook.md, CLAUDE.md). Asks for confirmation. Flags milestone impact (estimated completion date shifts). Appends calibration history entry to trends.md. Does not write without explicit yes.",
       "files": [],
       "assertions": [
-        "Output verifies the current EDHEC weekly goal from objectives.md (confirms 7h before accepting user's claim)",
+        "Output verifies the current Online Course weekly goal from objectives.md (confirms 7h before accepting user's claim)",
         "Output shows a clear before → after diff: weekly goal ≥7h → ≥5h",
         "Output identifies and includes runbook.md and/or CLAUDE.md in the list of files to update",
         "Output asks for explicit confirmation before applying any changes",
         "Output shows or offers to append a calibration history entry to wiki/trends.md",
         "Output does NOT actually modify any files — this is a read-only eval run"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "How does next week look? Vault: /Users/you/Documents/Claude/vault_personal, agent: agenda-manager.",
+      "expected_output": "Reads objectives.md §1 and §2 plus log.md entries for the current month. Computes monthly deficit per activity. Asks about next-week constraints. Outputs a prioritized allocation plan with progress bars, suggested hours, and catch-up flags. Does not write any files.",
+      "files": [],
+      "assertions": [
+        "Output correctly routes to Next Week Planning mode (not Weekly Review)",
+        "Output reads monthly targets and computes deficit vs actuals-to-date",
+        "Output asks the user about constraints for next week before generating the plan",
+        "Output shows a prioritized allocation table with P1 activities listed first",
+        "Output uses 🔴/🟡/🟢 flags to indicate catch-up severity",
+        "Output does NOT write any files — advisory only"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Hey coach. Vault: /Users/you/Documents/Claude/vault_personal, agent: agenda-manager. Just checking in on things.",
+      "expected_output": "Runs proactive checks before routing: checks for stale log (>7 days), undated quarterly goals, and rhythm-based progress check-ins for completion-tracked goals. Surfaces any that are due. Asks for progress before asking what mode the user wants.",
+      "files": [],
+      "assertions": [
+        "Output checks the most recent log entry date and flags if it is more than 7 days old",
+        "Output scans §3 Quarterly Goals for missing target dates and surfaces them",
+        "Output identifies any completion-tracked goals due for a progress check-in based on cadence",
+        "Output asks for progress on overdue check-in goals before routing to a mode",
+        "Output renders a completion bar (█/░) when the user provides a progress update",
+        "Output limits progress check-ins to at most 2 per session"
       ]
     }
   ]

@@ -16,17 +16,30 @@ updated: YYYY-MM-DD
 <!-- ## 2026-04-20 · weekly                                              -->
 <!--                                                                     -->
 <!-- mode: weekly                                                        -->
-<!-- job_search_h: 10.5                                                  -->
-<!-- job_search_pct: 105                                                 -->
-<!-- edhec_h: 4.8                                                        -->
-<!-- edhec_pct: 69                                                       -->
-<!-- running_ses: 3                                                      -->
-<!-- running_pct: 100                                                    -->
-<!-- lectura_h: 0.9                                                      -->
-<!-- lectura_pct: 45                                                     -->
+<!-- work_project_h: 10.5                                                -->
+<!-- work_project_pct: 105                                               -->
+<!-- online_course_h: 4.8                                                -->
+<!-- online_course_pct: 69                                               -->
+<!-- exercise_ses: 3                                                      -->
+<!-- exercise_pct: 100                                                   -->
+<!-- reading_h: 0.9                                                       -->
+<!-- reading_pct: 45                                                      -->
 <!-- blocks_created: 8                                                   -->
 <!-- conflicts: 2                                                        -->
 <!-- note: optional free-text observation                                -->
+<!--                                                                     -->
+<!-- OPTIONAL COMPLETION TRACKING FIELDS                                 -->
+<!-- (for activities with Tracking: completion:X in objectives.md)       -->
+<!-- online_course_completion: 4/12           ← e.g. module 4 of 12     -->
+<!-- online_course_completion_pct: 33         ← percent complete         -->
+<!-- reading_completion: 80/200              ← e.g. page 80 of 200      -->
+<!-- reading_completion_pct: 40                                          -->
+<!-- ──────────────────────────────────────────────────────────────────── -->
+
+<!-- PROGRESS CHECK-IN FIELDS                                            -->
+<!-- Written when coach asks a rhythm-based progress check-in            -->
+<!-- progress_checkin_[activity]: YYYY-MM-DD · X/Y · NN%                -->
+<!-- progress_checkin_reading: 2026-04-19 · 80/200 · 40%               -->
 <!-- ──────────────────────────────────────────────────────────────────── -->
 
 <!-- DAILY ENTRY FORMAT (written by agenda-manager)                      -->
@@ -37,5 +50,5 @@ updated: YYYY-MM-DD
 <!-- changes: 1                                                          -->
 <!-- conflicts: 1                                                        -->
 <!-- at_risk: 0                                                          -->
-<!-- note: First run — deleted duplicate Coursera block                  -->
+<!-- note: First run — deleted duplicate block                           -->
 <!-- ──────────────────────────────────────────────────────────────────── -->
