@@ -27,19 +27,50 @@ timezone: Region/City     ← e.g. America/Mexico_City · used for all calendar 
 
 ## §1 · Weekly Targets
 
-| Activity | Type | Weekly Goal | Tracking | Notes |
-|---|---|---|---|---|
-| [Activity 1] | must-do | ≥Xh | hours | |
-| [Activity 2] | habit | ≥X sessions | sessions | |
-| [Activity 3] | habit | ≥Xh | hours | |
-| [Activity 4] | project | ≥Xh | completion:200pages | e.g. book — tracks to a finish line |
+<!--
+  One row per activity. Priority column:
+    P0 = daily non-negotiables (meals, routines) — never scored, never scheduled by the skill, never moved
+    P1 = highest-priority tracked activities — recovered first when behind
+    P2 = secondary tracked activities — recovered after P1s are covered
 
-> **Type column values:** `must-do` · `habit` · `project`
+  P0 rows: set Weekly Goal = — and Tracking = —
+  Window column: preferred time range, e.g. "10:00–13:00", "flex/weekend", "honor system", "[App]-owned"
+  Duration column: typical single-block length, e.g. "2h", "1–1.5h", "30 min"
+  Notes column: colorId N (1–11), "DO NOT create blocks", special rules
+
+  Add window-sharing and special notes as plain text below the table.
+-->
+
+| Priority | Activity | Type | Weekly Goal | Window | Duration | Tracking | Notes |
+|---|---|---|---|---|---|---|---|
+| P0 | [🌞 Morning Routine] | must-do | — | [HH:MM–HH:MM] | [X min] | — | colorId [N] |
+| P0 | [🍳 Breakfast] | must-do | — | [HH:MM–HH:MM] | [X min] | — | colorId [N] · after routine |
+| P0 | [🏠 Home Tasks] | must-do | — | [HH:MM–HH:MM] | [X min] | — | colorId [N] · after breakfast |
+| P0 | [🍽️ Lunch] | must-do | — | [HH:MM–HH:MM] | [X min] | — | colorId [N] |
+| P0 | [🌙 Dinner] | must-do | — | [HH:MM–HH:MM] | [X min] | — | colorId [N] |
+| P1 | [💼 Main Work Activity] | must-do | ≥[X]h | [HH:MM–HH:MM] | [Xh] | hours | min [X]h continuous |
+| P1 | [🎓 Learning Activity] | project | ≥[X]h | [HH:MM–HH:MM] | [1.5–2h] | completion:[X]units | target completion [date] |
+| P2 | [🤖 Secondary Learning] | habit | ≥[X]h | flex/weekend | [1h] | hours | no fixed slot |
+| P2 | [🌐 Side Project A] | project | ≥[X]h | [HH:MM–HH:MM] | [1–1.5h] | hours | colorId [N] |
+| P2 | [🏦 Side Project B] | project | ≥[X]h solo | [HH:MM–HH:MM] | [1–1.5h] | hours | alt days with [Project A] |
+| P2 | [🏃 Session Activity] | habit | ≥[N] sessions | [App]-owned | — | sessions | DO NOT create blocks |
+| P2 | [🏋️ Self-Tracked Activity] | habit | ≥[N] sessions | honor system | — | sessions | NOT in calendar |
+| P2 | [📚 Evening Activity] | habit | ≥[X]h | [HH:MM–HH:MM] | [30 min] | hours | colorId [N] |
+
+<!--
+  Add window-sharing, sleeping projects, and special rules below as plain text:
+
+  **Window sharing — [Project A] / [Project B]:** Both share [HH:MM–HH:MM].
+  Default: [Project A] gets Mon/Wed/Fri · [Project B] gets Tue/Thu. Swap if one met goal.
+
+  **[Sleeping project]:** SLEEPING. Do not schedule, track hours, or include in reports until reactivated.
+
+  **[Self-tracked activity]:** Not in calendar ([reason]). Honor system: confirm in weekly review.
+-->
+
+> **Type values:** `must-do` · `habit` · `project`
 >
-> **Tracking column values:**
-> - `hours` (default) — standard recurring-hours goal
-> - `sessions` — session-count goal (gym, runs, etc.)
-> - `completion:Xunits` — project with a finish line: `completion:200pages`, `completion:12modules`
+> **Tracking values:** `hours` · `sessions` · `completion:Xunits` (e.g. `completion:200pages`)
 >
 > Projects must also have a target date in §3 Quarterly Goals or §4 Project Milestones.
 

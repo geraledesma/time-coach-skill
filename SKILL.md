@@ -244,7 +244,7 @@ conflicts: 2
 
 1. Compute period start/end: from the last review entry date + `review_cadence` days (or from the start of the current week if no prior entry).
 2. Call `mcp__claude_ai_Google_Calendar__list_events` for each calendar in runbook §1. Use ISO 8601 `timeMin`/`timeMax` with the `timezone` from `§ Config`.
-3. Map event titles to activity keys using §2 activity names and emojis (exact title → emoji prefix → fuzzy text). P0 events: skip. All-day events: skip. Events < 10 min: skip.
+3. Map event titles to activity keys using `objectives.md §1` activity names and emojis (exact title → emoji prefix → fuzzy text). P0 events: skip. All-day events: skip. Events < 10 min: skip.
 4. Derive hours: `sum((end - start) in hours)` per activity key. For session-tracked activities, count qualifying events as sessions (e.g. Runna calendar events → running sessions).
 5. Show a pre-scorecard confirmation before computing:
    ```
@@ -271,8 +271,8 @@ weekly actuals table covering the current or most recent period, use that data a
 
 ### Get priority
 
-Read priority from `runbook.md` §2 Schedule Rules (the `Prio` column: P0, P1, P2).
-If `runbook.md` is absent, infer priority from ordering in `objectives.md` §1 — activities
+Read priority from the `Priority` column in `objectives.md §1` (P0, P1, P2).
+If the Priority column is absent (legacy vault), infer from activity ordering in §1 — activities
 listed first are assumed higher priority — or ask the user once during onboarding.
 
 P0 activities (meals, routines) are never in the scorecard. Only P1 and P2 appear.
@@ -515,10 +515,10 @@ Activity           Suggested   Window             Days
 ──────────────────────────────────────────────────────────────────────
 ```
 
-- `Window` and `Duration` data from runbook.md §2.
+- `Window` and `Duration` data from `objectives.md §1` Window and Duration columns.
 - Activities with `flex/weekend` or `honor system`: show "flexible" for Window.
 - Session-only / `DO NOT create blocks` activities: show window source (e.g. "[App]-owned") and `—` for days.
-- Window-sharing rules (e.g. competing P2 projects): reproduce the note from §2 below the table.
+- Window-sharing rules (e.g. competing P2 projects): reproduce the note from the text block below the §1 table.
 
 ### § Create Calendar Blocks (runs if `gcal_available = true`)
 
@@ -531,7 +531,7 @@ After the schedule suggestions, offer:
 3. For missing days: compute slot start from §2 window. Check §3 buffer rules against fetched events. If conflict: shift to next available 30-min slot within the window. If no slot available: flag AT_RISK, do not create.
 4. Call `mcp__claude_ai_Google_Calendar__create_event` for each needed block:
    - `calendarId`: Read+Write calendar ID from runbook §1
-   - `summary`: activity emoji + name (matching §2 exactly)
+   - `summary`: activity emoji + name (matching objectives.md §1 exactly)
    - `start` / `end`: computed ISO 8601 with timezone from §1
    - `colorId`: from §2 Notes column if specified
 5. Never create blocks for activities marked `DO NOT create blocks` or `honor system`.
@@ -689,10 +689,9 @@ If any part is ambiguous, ask before proceeding.
 
 Before showing the diff, scan for every file that mirrors this goal value:
 
-1. `raw/objectives.md` — §1 (weekly) and §2 (monthly, if derived from weekly)
-2. `runbook.md` (if it exists) — §2 Schedule Rules table row for this activity
-3. `CLAUDE.md` (if it exists at the vault root or in context) — Weekly Goals table row
-4. Any other file that references the old goal value for this activity
+1. `raw/objectives.md` — §1 (weekly goal, Window, Priority columns) and §2 (monthly, if derived from weekly)
+2. `CLAUDE.md` (if it exists at the vault root or in context) — Weekly Goals table row
+3. Any other file that references the old goal value for this activity
 
 ### Show the full diff
 
@@ -700,25 +699,21 @@ Before showing the diff, scan for every file that mirrors this goal value:
 Proposed change — Online Course weekly goal: ≥7h → ≥5h
 
 1. raw/objectives.md §1:
-   Before: | 🎓 Online Course | ≥7h  | …
-   After:  | 🎓 Online Course | ≥5h  | …
+   Before: | P1 | 🎓 Online Course | ≥7h | … |
+   After:  | P1 | 🎓 Online Course | ≥5h | … |
 
 2. raw/objectives.md §2 (monthly, if cascading):
    Before: | 🎓 Online Course | ≥28h | 7h/week × 4 |
    After:  | 🎓 Online Course | ≥20h | 5h/week × 4 |
 
-3. runbook.md §2 (if present):
-   Before: P1 | 🎓 Online Course | ≥7h | …
-   After:  P1 | 🎓 Online Course | ≥5h | …
-
-4. CLAUDE.md Weekly Goals (if present):
+3. CLAUDE.md Weekly Goals (if present):
    Before: | 🎓 Online Course | ≥7h | … |
    After:  | 🎓 Online Course | ≥5h | … |
 
 Apply all of the above? (yes / no)
 ```
 
-If any of files 2–4 are not found, skip them silently — don't error.
+If any of files 2–3 are not found, skip them silently — don't error.
 
 ### On confirmation
 
@@ -772,7 +767,7 @@ If `today - last_sync_date < sync_cadence` days: "Last sync was [N] day(s) ago (
 past   = blocks where end < now  →  tally actual hours/sessions per category
 future = blocks where start > now
 
-Categories: read from runbook.md §2 Prio column (P1 + P2 only). Skip P0 and sleeping projects.
+Categories: read from `objectives.md §1` Priority column (P1 + P2 only). Skip P0 and sleeping projects.
 
 STEP 1 [DUPLICATE]  ≥2 Claude blocks same category same future day
   → merge: sum durations · place in preferred window · respect §3
@@ -826,10 +821,10 @@ If `today - last_write_date < write_cadence` days: warn and ask to confirm befor
 
 **CREATE SKELETON** (gaps only, P0 → P1 → P2):
 - A Claude block already exists for that category on that day → skip
-- Missing → create one block in preferred §2 window, respecting §3 buffer rules
+- Missing → create one block in preferred window from `objectives.md §1`, respecting §3 buffer rules
 - P0 ordering: if both Breakfast and Home Tasks are being created on the same day, place Home Tasks immediately after Breakfast
 - Distribute remaining hours evenly across days missing a block; round to 30 min; minimum 30 min per block
-- Window-sharing rules from §2 note block (e.g. alternate days between competing P2 projects)
+- Window-sharing rules from the text block below the `objectives.md §1` table (e.g. alternate days between competing P2 projects)
 - `DO NOT create blocks` activities (e.g. session activities managed by a fitness app): skip
 - `honor system` activities: skip
 
@@ -879,11 +874,12 @@ After collecting activities and goals, offer:
 
 **If yes:**
 1. Show the cached `gcal_calendars` list → "Which calendar should I write scheduling blocks to? (enter number)"
-2. For each activity: "What time window works best for [Activity]? (e.g. '10:00–13:00 weekdays', 'flex/weekend', 'honor system', or press Enter to skip)"
-3. Ask: "What's your timezone? (e.g. America/Mexico_City)"
-4. Ask: "Any buffer rules? (e.g. 'always 15 min before lunch', or Enter to use defaults)"
-5. Scaffold `runbook.md` from `references/runbook-template.md`, filling in §1 (calendars + timezone), §2 (one row per activity with entered windows), §3 (buffer rules or defaults), §4 (`[VAULT]` placeholder).
-6. Add `runbook.md` to the files created list in the Finish output.
+2. For each activity collected in step 2–3: "What time window works best for [Activity]? (e.g. '10:00–13:00 weekdays', 'flex/weekend', 'honor system', or press Enter to skip)" — write each answer into the `Window` column of the activity's row in `raw/objectives.md §1`.
+3. Also collect a duration per activity ("Typical block length? e.g. '2h', '30 min'") and write to the `Duration` column.
+4. Ask: "What's your timezone? (e.g. America/Mexico_City)"
+5. Ask: "Any buffer rules? (e.g. 'always 15 min before lunch', or Enter to use defaults)"
+6. Scaffold `runbook.md` from `references/runbook-template.md`, filling in §1 (calendars + timezone), §3 (buffer rules or defaults), §4 (`[VAULT]` placeholder). §2 is just the pointer line — no activity rows.
+7. Add `runbook.md` to the files created list in the Finish output.
 
 **If skip:** Continue to file creation with no runbook.md. Skill operates in no-calendar mode.
 
