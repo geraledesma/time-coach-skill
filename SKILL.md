@@ -19,7 +19,10 @@ A personal time management coach that works entirely from plain markdown files. 
 goals and activity log, computes progress, flags risks, and proposes concrete calibrations —
 then applies approved changes back to your config files.
 
-No calendar. No external MCPs. Just you and your vault.
+No calendar required. Google Calendar integration is optional and auto-detected.
+When connected, the skill reads actuals from your calendar, suggests and creates
+scheduling blocks, and runs autonomous daily/weekly sync. Without it, the skill
+works entirely from plain markdown files.
 
 ---
 
@@ -81,6 +84,21 @@ tracks, coaches, and calibrates each activity. Three types are supported:
 
 ---
 
+## Step 0 — Capability Probe (silent, always runs first)
+
+Attempt `mcp__claude_ai_Google_Calendar__list_calendars` with no arguments.
+- Success → set `gcal_available = true`. Cache the returned calendar list in session memory.
+- Any error (tool not found, permission denied, or any other error) → set `gcal_available = false`. Do not surface this to the user.
+
+After Step 1 locates the vault, also check for `<vault-root>/agents/<agent-name>/runbook.md` with a `§1 · Calendars` section:
+- Present with §1 → set `runbook_available = true`. Parse the Read+Write calendar ID from §1.
+- Absent or §1 missing → set `runbook_available = false`.
+
+Also read `objectives.md § Config` to get `review_cadence`, `sync_cadence`, `write_cadence`, `write_horizon`, `timezone`.
+If `§ Config` is absent, use defaults: `review_cadence=7`, `sync_cadence=1`, `write_cadence=7`, `write_horizon=7`.
+
+---
+
 ## Step 1 — Orient (always first)
 
 Before doing anything else, figure out where the vault lives:
@@ -89,6 +107,14 @@ Before doing anything else, figure out where the vault lives:
    names a vault path? If yes, confirm it: "I'll use `<path>` — is that right?"
 2. **Otherwise ask once:** "Where's your vault root? (e.g. `~/Documents/my-vault`)"
    Also ask: "What's the agent folder called? (default: `agenda-manager`)"
+
+**Legacy vault migration:** Before checking files, detect whether a vault migration is needed:
+1. Check `<vault-root>/agents/time-coach/` — if present, use it.
+2. Else check `<vault-root>/agents/agenda-manager/` — if present, offer once:
+   > "I found your vault at `agents/agenda-manager/`. Want me to rename it to `agents/time-coach/` to match the skill? (yes / keep as-is)"
+   - If yes: rename the folder, report `✅ Vault migrated to agents/time-coach/`, continue.
+   - If no: use `agents/agenda-manager/` for the session.
+3. If neither exists: go to **Onboarding** mode.
 
 Then check which files exist at `<vault-root>/agents/<agent-name>/`:
 - All present → continue to Step 1b
@@ -102,10 +128,10 @@ log data (Weekly Review, Next Week Planning, Monthly Pacing). Skip for Proposal 
 Goal Adjustment.
 
 **Check A — Stale log:**
-Read the date header of the most recent `## YYYY-MM-DD · weekly` entry in `log.md`.
-If that date is more than 7 days before today:
-> "Last entry was [YYYY-MM-DD] — [N] days ago. Want to do a quick check-in first before [requested mode]? (yes / no)"
-If yes: run Weekly Review first, then return to the originally requested mode.
+Read the date header of the most recent `## YYYY-MM-DD · review` (or legacy `## YYYY-MM-DD · weekly`) entry in `log.md`.
+If that date is more than `review_cadence` days before today:
+> "Last review was [YYYY-MM-DD] — [N] days ago. Want to do a quick check-in first before [requested mode]? (yes / no)"
+If yes: run Review first, then return to the originally requested mode.
 
 **Check B — Undated quarterly goals:**
 Scan `raw/objectives.md` §3 Quarterly Goals for any row where Target Date is blank, `—`, `TBD`,
@@ -150,32 +176,35 @@ Run all three checks in sequence. If none fire, proceed to routing silently.
 
 | User intent | Mode |
 |---|---|
-| "how did my week go", "weekly review", "score my week", "review actuals" | Weekly Review |
+| "how did my week go", "weekly review", "review", "score my week", "review actuals" | Review |
 | "next week", "plan next week", "how does next week look", "weekly planning", "what should I focus on next week", "prepare for next week" | Next Week Planning |
 | "monthly pacing", "am I on track", "how many hours left this month" | Monthly Pacing |
 | "show proposals", "pending changes", "approve…", "reject…" | Proposal Review |
 | "change my X goal", "lower/raise X to Y", "adjust target" | Goal Adjustment |
 | "set up", "new vault", "onboard me", "start fresh" | Onboarding |
+| "sync calendar", "run daily sync", "update blocks", "daily sync" | Calendar Sync |
+| "create next week blocks", "schedule next week", "write calendar", "weekly write" | Calendar Write |
+| "quick status", "status", "how are things" | Quick Status |
 | Present-tense + no temporal marker (e.g. "how is my week looking") | Ask: "Do you mean how this week went (review actuals), or how next week looks (planning ahead)?" |
-| Unclear | Ask: "What would you like to do — weekly review, next week planning, monthly pacing, review proposals, or adjust a goal?" |
+| Unclear | Ask: "What would you like to do — review, next week planning, monthly pacing, review proposals, adjust a goal, or calendar sync?" |
 
 ---
 
-## Mode: Weekly Review
+## Mode: Review
 
-**Goal:** Show the user exactly how the week went and what needs attention.
+**Goal:** Show the user exactly how the tracked period went and what needs attention.
 
 ### Read
 - `raw/objectives.md` §1 — weekly targets (activities + goals)
 - `log.md` — look for the most recent `## [YYYY-MM-DD] weekly` entry
 
 ### Log format
-Weekly entries use a labeled key-value format, one field per line:
+Review entries use a labeled key-value format, one field per line. Header uses `· review`; legacy `· weekly` entries are parsed identically.
 
 ```
-## YYYY-MM-DD · weekly
+## YYYY-MM-DD · review
 
-mode: weekly
+mode: review
 <activity-key>_h: X.X         ← hours (float)
 <activity-key>_ses: N         ← sessions (integer, for exercise etc.)
 <activity-key>_pct: NN        ← % of weekly goal (integer)
@@ -186,9 +215,9 @@ note: optional free-text
 
 Example:
 ```
-## 2026-04-20 · weekly
+## 2026-04-20 · review
 
-mode: weekly
+mode: review
 work_project_h: 10.5
 work_project_pct: 105
 online_course_h: 4.8
@@ -209,14 +238,36 @@ conflicts: 2
 
 ### Get actuals
 
-**If a weekly entry exists for the current week:** parse the `_h`, `_ses`, `_pct` fields directly.
+**If a review entry exists for the current period:** parse the `_h`, `_ses`, `_pct` fields directly.
 
-**If no weekly entry exists:** Tell the user: "I don't see a log entry for this week yet.
-Could you walk me through your actuals?" Ask per activity (or as a list), then derive `_pct`
-from the goals in `objectives.md`.
+**If no entry exists and `gcal_available = true`:** Read actuals from Google Calendar.
+
+1. Compute period start/end: from the last review entry date + `review_cadence` days (or from the start of the current week if no prior entry).
+2. Call `mcp__claude_ai_Google_Calendar__list_events` for each calendar in runbook §1. Use ISO 8601 `timeMin`/`timeMax` with the `timezone` from `§ Config`.
+3. Map event titles to activity keys using §2 activity names and emojis (exact title → emoji prefix → fuzzy text). P0 events: skip. All-day events: skip. Events < 10 min: skip.
+4. Derive hours: `sum((end - start) in hours)` per activity key. For session-tracked activities, count qualifying events as sessions (e.g. Runna calendar events → running sessions).
+5. Show a pre-scorecard confirmation before computing:
+   ```
+   From your calendar ([start] – [end]):
+     💼 Main Activity:   8.5h   (Mon 2h, Tue 2h, Wed 2h, Thu 2.5h)
+     🎓 Learning:        5.0h
+     🏃 Running:         3 sessions  (from [App] calendar)
+     ⚠️  Unmatched (2): "Lunch with Ana" · "Call Luis"
+
+   Does this look right? (yes / edit / skip to manual entry)
+   ```
+6. If "edit": allow the user to correct specific values per activity. If "skip to manual entry": fall through to manual entry below.
+7. On confirmation: feed actuals into the scoring pipeline. Add `actuals_source: gcal` to the log entry.
+
+**Edge cases:**
+- Partial coverage (e.g. calendar only has 3 of 7 days): warn — "I could only find events [range]. Want me to fill in the rest manually?"
+- Multi-activity event titles: treat as unmatched, surface for user decision.
+- `gcal_available = true` but `runbook_available = false`: prompt once for calendar ID + timezone before fetching.
+
+**If no entry exists and `gcal_available = false`:** Tell the user: "I don't see a log entry for this period yet. Could you walk me through your actuals?" Ask per activity (or as a list), then derive `_pct` from the goals in `objectives.md`.
 
 **Fallback — trends.md:** If `log.md` has no relevant entries but `wiki/trends.md` has a
-weekly actuals table covering the current or most recent week, use that data and note the source.
+weekly actuals table covering the current or most recent period, use that data and note the source.
 
 ### Get priority
 
@@ -302,11 +353,11 @@ Sort the scorecard rows by:
 This surfaces the most important at-risk items first: a P1 at 50% is more urgent than a P2
 at 50%, and a P2 at 100% is less urgent than a P2 at 40%.
 
-### Output — Weekly Scorecard
+### Output — Review Scorecard
 
 ```
 ──────────────────────────────────────────────────────────────────
-Weekly Review · Mon DD – Sun DD, YYYY
+Review · Mon DD – Sun DD, YYYY
 ──────────────────────────────────────────────────────────────────
 P   Type      Activity            Progress              Actual    %      Flag
 ─── ──────── ─────────────────── ──────────────────── ───────── ─────  ────
@@ -337,7 +388,7 @@ Then:
 ### Log the entry
 
 After showing the scorecard, ask:
-> "Want me to log this week's entry to `log.md` and update streak counts in `trends.md`? (yes / no)"
+> "Want me to log this review entry to `log.md` and update streak counts in `trends.md`? (yes / no)"
 
 If yes, append to `log.md` using the key-value format above.
 
@@ -371,7 +422,7 @@ Apr W3  ────── current week ──────
 
 After rendering, offer: "Want to see another activity's trend, or continue? (activity name / done)"
 
-### Next Week offer
+### Next period offer
 
 After the trend chart (or if the user skips it), offer:
 > "Want to plan next week while we're here? (yes / skip)"
@@ -445,6 +496,50 @@ Then:
 - **One concrete scheduling tip** based on the highest catch-up activity.
 
 **No file write in this mode — advisory only.** Do not offer to log this plan.
+
+### § Schedule Windows (runs if `runbook_available = true`)
+
+After the Next Week Plan output table, show a schedule suggestions table using §2 data:
+
+```
+──────────────────────────────────────────────────────────────────────
+Schedule Suggestions · Mon DD – Sun DD, YYYY
+──────────────────────────────────────────────────────────────────────
+Activity           Suggested   Window             Days
+─────────────────  ─────────   ────────────────── ──────────────────
+💼 Main Activity   11h         10:00–13:00        Mon–Fri  (2h/day)
+🎓 Learning         7h         17:00–20:00        Mon,Wed,Thu,Fri
+🌐 Side Project A   4h         13:30–15:00        Mon/Wed/Fri
+🏃 Session Act.     3 ses      [App]-owned        —
+📚 Evening Act.     2h         21:15–22:15        Any 4 days
+──────────────────────────────────────────────────────────────────────
+```
+
+- `Window` and `Duration` data from runbook.md §2.
+- Activities with `flex/weekend` or `honor system`: show "flexible" for Window.
+- Session-only / `DO NOT create blocks` activities: show window source (e.g. "[App]-owned") and `—` for days.
+- Window-sharing rules (e.g. competing P2 projects): reproduce the note from §2 below the table.
+
+### § Create Calendar Blocks (runs if `gcal_available = true`)
+
+After the schedule suggestions, offer:
+> "Want me to create these blocks on your Google Calendar? I'll use your write calendar and stay within your §2 windows. (yes / customize / skip)"
+
+**"yes" flow:**
+1. Call `mcp__claude_ai_Google_Calendar__list_events` on the write calendar for next week's date range.
+2. For each activity in the plan, skip days that already have a block for that category (same emoji/title prefix).
+3. For missing days: compute slot start from §2 window. Check §3 buffer rules against fetched events. If conflict: shift to next available 30-min slot within the window. If no slot available: flag AT_RISK, do not create.
+4. Call `mcp__claude_ai_Google_Calendar__create_event` for each needed block:
+   - `calendarId`: Read+Write calendar ID from runbook §1
+   - `summary`: activity emoji + name (matching §2 exactly)
+   - `start` / `end`: computed ISO 8601 with timezone from §1
+   - `colorId`: from §2 Notes column if specified
+5. Never create blocks for activities marked `DO NOT create blocks` or `honor system`.
+6. Report: "Created N blocks · Skipped N (already had blocks) · Flagged N AT_RISK."
+
+**"customize" flow:** Present each proposed block individually — "Create [Activity] [Day] [Time]? (yes / change time / skip)". Batch-create confirmed blocks.
+
+**`gcal_available = false`:** Both sub-sections omitted entirely. Output unchanged.
 
 ---
 
@@ -640,6 +735,119 @@ If any of files 2–4 are not found, skip them silently — don't error.
 
 ---
 
+## Mode: Quick Status
+
+**Goal:** Give a 3-line orientation without running a full review.
+
+**Read:** `log.md` (last review entry date and top actuals), latest `reports/YYYY-MM-DD_daily.md` if present.
+
+**Output:**
+```
+Last review: [YYYY-MM-DD] · [N] days ago
+This period's pace: [top 3 activities with %]
+Next sync: [last sync date + sync_cadence, or "not configured" if gcal_available = false]
+```
+
+No file writes. Offer: "Want a full review, or run a calendar sync? (review / sync / done)"
+
+---
+
+## Mode: Calendar Sync
+
+**Goal:** Run the daily calendar maintenance pass — deduplicate, resolve conflicts, prune met goals, create recovery blocks.
+
+**Requires:** `gcal_available = true` AND `runbook_available = true`. If either is false: "Calendar sync requires Google Calendar and a configured runbook.md. See `references/runbook-template.md` to set one up."
+
+**Cadence gate:** Read the most recent `## YYYY-MM-DD · sync` or `## YYYY-MM-DD · daily` entry in `log.md`.
+If `today - last_sync_date < sync_cadence` days: "Last sync was [N] day(s) ago (cadence: [sync_cadence]). Running early — proceed anyway? (yes / no)"
+
+**FETCH** (3 parallel calls):
+- Write calendar · today through Sunday (or today + write_horizon if that's larger)
+- Personal calendar · same range
+- All Read-only calendars in runbook §1 · same range
+
+**ANALYZE** (single pass, no API calls):
+
+```
+past   = blocks where end < now  →  tally actual hours/sessions per category
+future = blocks where start > now
+
+Categories: read from runbook.md §2 Prio column (P1 + P2 only). Skip P0 and sleeping projects.
+
+STEP 1 [DUPLICATE]  ≥2 Claude blocks same category same future day
+  → merge: sum durations · place in preferred window · respect §3
+  → run first — merged result feeds steps 2–4
+
+STEP 2 [CONFLICT]  Claude block overlaps any block or violates §3 buffer rules
+  → P0/Personal/Read-only calendar blocks: untouchable
+  → move lower-priority Claude block to next available slot in window
+  → if no slot: trim to 30 min minimum or flag AT_RISK
+  → single pass; re-check after each move
+
+STEP 3 [MET_PRUNE]  actual ≥ goal
+  → delete ALL future Claude blocks for that category
+  → if actual + remaining future > goal × 1.10 → trim to goal × 1.0
+
+STEP 4 [AT_RISK]  actual + future < goal  (P1 first, then P2)
+  → create recovery block in preferred window · respect §3
+  → if window full, use nearest available slot within hard window from §3
+```
+
+**WRITE:** Execute all flagged actions in parallel via `mcp__claude_ai_Google_Calendar__create_event`, `update_event`, `delete_event`.
+
+**HORIZON CHECK** (compute only, no API calls):
+For each P1/P2 activity with a monthly target in `objectives.md §2`:
+```
+remaining_needed   = monthly_target − cumulative_actual_this_month
+remaining_days     = calendar days left in month (including today)
+needed_daily_pace  = remaining_needed / remaining_days
+normal_daily_pace  = weekly_goal / 7
+
+flag:  ≤0 → ✅   >normal×1.2 → 🔴   >normal → 🟡   else → 🟢
+```
+
+**Log:** Append `## YYYY-MM-DD · sync | Changes: N · Conflicts: N · AT_RISK: N · [brief note if unusual]`
+
+**Report:** Bar chart of actuals + one line per change made + 2-sentence outlook + Monthly Horizon section.
+Offer to write to `reports/YYYY-MM-DD_daily.md`.
+
+---
+
+## Mode: Calendar Write
+
+**Goal:** Create a block skeleton covering the next `write_horizon` days, log the weekly report, and update trends.
+
+**Requires:** `gcal_available = true` AND `runbook_available = true`. If either is false: see Calendar Sync error message.
+
+**Cadence gate:** Read the most recent `## YYYY-MM-DD · write` entry in `log.md`.
+If `today - last_write_date < write_cadence` days: warn and ask to confirm before proceeding.
+
+**FETCH:** Write calendar · today through today + `write_horizon` days.
+
+**CREATE SKELETON** (gaps only, P0 → P1 → P2):
+- A Claude block already exists for that category on that day → skip
+- Missing → create one block in preferred §2 window, respecting §3 buffer rules
+- P0 ordering: if both Breakfast and Home Tasks are being created on the same day, place Home Tasks immediately after Breakfast
+- Distribute remaining hours evenly across days missing a block; round to 30 min; minimum 30 min per block
+- Window-sharing rules from §2 note block (e.g. alternate days between competing P2 projects)
+- `DO NOT create blocks` activities (e.g. session activities managed by a fitness app): skip
+- `honor system` activities: skip
+
+**WEEKLY REPORT:**
+1. Bar chart: actual vs weekly goal per activity (20 chars · % · flag) — P1 first, P2 second. Omit P0 and sleeping projects.
+2. Monthly progress: cumulative actual vs monthly target (% + days remaining).
+3. Trend proposals: for each activity with a missed-goal streak ≥2 consecutive weeks, diagnose and propose a config change (same logic as the existing Proposal Review mode — do not apply; write proposal text only to the report).
+4. Catch-up: activities < 80% → recommended recovery hours for the coming week.
+5. Outlook: 3 sentences — what's on track, what needs attention, one concrete suggestion.
+
+**UPDATE LOG + TRENDS:**
+- Append to `log.md`: `## YYYY-MM-DD · write | Blocks created: N · Skipped: N`
+- Update streak counts table in `wiki/trends.md` (same logic as Review mode log step).
+
+Offer to write the full report to `reports/YYYY-MM-DD_weekly.md`.
+
+---
+
 ## Mode: Onboarding
 
 **Goal:** Scaffold the vault from scratch for a new user.
@@ -664,6 +872,21 @@ Ask:
 
 4. "Monthly targets — should I derive them as 4× the weekly goal, or do you want to set them manually?"
 
+### Step 4b — GCal configuration (runs if `gcal_available = true`)
+
+After collecting activities and goals, offer:
+> "I can see Google Calendar is connected. Want me to set up a scheduling runbook? This lets me read your actuals from the calendar and create/sync blocks automatically. (yes / skip)"
+
+**If yes:**
+1. Show the cached `gcal_calendars` list → "Which calendar should I write scheduling blocks to? (enter number)"
+2. For each activity: "What time window works best for [Activity]? (e.g. '10:00–13:00 weekdays', 'flex/weekend', 'honor system', or press Enter to skip)"
+3. Ask: "What's your timezone? (e.g. America/Mexico_City)"
+4. Ask: "Any buffer rules? (e.g. 'always 15 min before lunch', or Enter to use defaults)"
+5. Scaffold `runbook.md` from `references/runbook-template.md`, filling in §1 (calendars + timezone), §2 (one row per activity with entered windows), §3 (buffer rules or defaults), §4 (`[VAULT]` placeholder).
+6. Add `runbook.md` to the files created list in the Finish output.
+
+**If skip:** Continue to file creation with no runbook.md. Skill operates in no-calendar mode.
+
 ### Create files
 
 **`raw/objectives.md`** — from `references/objectives-template.md`, filled with user's data.
@@ -683,8 +906,10 @@ Files created:
   raw/objectives.md  ← your goals config
   log.md             ← activity log (starts empty)
   wiki/trends.md     ← streak tracking (starts empty)
+  runbook.md         ← Google Calendar schedule rules  [only if Step 4b completed]
 
-Run /time-coach again and say "weekly review" to start tracking.
+Run /time-coach again and say "review" to start tracking.
+[If runbook.md was created: "During review, I'll read your actuals directly from Google Calendar."]
 ```
 
 ---
@@ -707,14 +932,20 @@ Run /time-coach again and say "weekly review" to start tracking.
 
 ## For GitHub / Cowork marketplace publishing
 
-This skill has **no external MCP dependencies**. It reads and writes plain `.md` files only.
+This skill has **no required external MCP dependencies**. Google Calendar integration is optional and auto-detected at session start. Without it, the skill reads and writes plain `.md` files only.
 
 The vault structure is intentionally flexible:
 - Activity names and emojis are read from `objectives.md` — not hardcoded
 - Log format is structured key-value — LLM-parseable and human-readable
-- Works alongside `agenda-manager` or standalone
+- Review cadence, sync cadence, and calendar write horizon are all user-configurable via `objectives.md § Config`
 
-To publish: copy this directory to your GitHub repo. Users install via Cowork marketplace or
-by placing the folder in their skills directory.
+**Coworks scheduled triggers:** Point a daily trigger and a weekly trigger at this skill. The skill's internal cadence gates (`sync_cadence`, `write_cadence` in `§ Config`) control whether each run actually executes — Coworks frequency does not need to change when you adjust cadences.
 
-Reference templates for new-user onboarding live in `references/`.
+**Deprecates:** `agenda-manager` and `agenda-companion` skills. If migrating, re-point existing Coworks scheduled triggers from those skills to `time-coach` with context hints "run calendar sync" (daily) and "run calendar write" (weekly/Sunday).
+
+To publish: copy this directory to your GitHub repo. Users install via Cowork marketplace or by placing the folder in their skills directory.
+
+Reference templates for new-user onboarding live in `references/`:
+- `objectives-template.md` — goals config including the `§ Config` cadence block
+- `runbook-template.md` — Google Calendar schedule rules (fill in for calendar integration)
+- `log-template.md`, `trends-template.md` — activity log and streak tracking starters

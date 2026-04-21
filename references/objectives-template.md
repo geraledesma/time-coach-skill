@@ -9,6 +9,22 @@ updated: YYYY-MM-DD
 
 ---
 
+## § Config
+
+```
+review_cadence: 7         ← days between reviews (default 7; set to 3, 5, 14, etc.)
+sync_cadence: 1           ← days between calendar syncs (default 1 = daily; requires GCal MCP)
+write_cadence: 7          ← days between full calendar writes (default 7 = weekly; requires GCal MCP)
+write_horizon: 7          ← how many days ahead Calendar Write fills blocks (default 7; set to 3, 14, etc.)
+timezone: Region/City     ← e.g. America/Mexico_City · used for all calendar operations
+```
+
+> `sync_cadence`, `write_cadence`, and `write_horizon` are only used when Google Calendar is connected.
+> `review_cadence` controls the stale-log check — if your last review was more than this many days ago,
+> the skill will prompt you to do a review before anything else.
+
+---
+
 ## §1 · Weekly Targets
 
 | Activity | Type | Weekly Goal | Tracking | Notes |
