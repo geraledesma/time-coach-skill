@@ -90,6 +90,10 @@ Attempt `mcp__claude_ai_Google_Calendar__list_calendars` with no arguments.
 - Success → set `gcal_available = true`. Cache the returned calendar list in session memory.
 - Any error (tool not found, permission denied, or any other error) → set `gcal_available = false`. Do not surface this to the user.
 
+**Token budget — GCal responses (CRITICAL):** After every `list_events` or `get_event` call, immediately extract only `{id, summary, start.dateTime, end.dateTime, colorId}` from the response. Discard all other fields before any processing. Use `agents/time-coach/scripts/filter_gcal.py` if available, otherwise extract inline.
+
+**Week cache check (before calling `list_events`):** Before any `list_events` call, check `02-exec/week-cache.md`. If it exists and is < 6 hours old, read it instead of calling the API. Otherwise call `list_events`, apply the GCal filter (above), and write a new cache.
+
 After Step 1 locates the vault, also check for `<vault-root>/agents/<agent-name>/runbook.md` with a `§1 · Calendars` section:
 - Present with §1 → set `runbook_available = true`. Parse the Read+Write calendar ID from §1.
 - Absent or §1 missing → set `runbook_available = false`.
@@ -120,6 +124,10 @@ Then check which files exist at `<vault-root>/agents/<agent-name>/`:
 - All present → continue to Step 1b
 - Some missing → offer onboarding for the missing ones, then continue
 - None present → go to **Onboarding** mode
+
+### Step 1a — Config Files (read once)
+
+**Read exactly once at the start of Step 1:** Read `config.md` and `objectives.md`. Extract a compact working state (activities, calendar IDs, buffer rules). Reference this for the rest of the session — do not re-read.
 
 ### Step 1b — Proactive check-in (before routing)
 
@@ -189,6 +197,16 @@ Run all three checks in sequence. If none fire, proceed to routing silently.
 | Unclear | Ask: "What would you like to do — review, next week planning, monthly pacing, review proposals, adjust a goal, or calendar sync?" |
 
 ---
+
+## Response Verbosity Rules
+
+**Weekly schedule tables:** Write full table to file, respond with ≤5 lines + link only.
+**GCal operation summaries:** List counts (created/skipped/flagged), not individual entries.
+**Config updates:** Confirm changes in ≤3 lines, no full file echoes.
+
+---
+
+## Mode: Review
 
 ## Mode: Review
 
