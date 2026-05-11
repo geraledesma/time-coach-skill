@@ -26,26 +26,25 @@ works entirely from plain markdown files.
 
 ---
 
-## Vault structure
+## Config structure
 
-The skill expects this layout (creates it on first run if missing):
+The skill reads from a single **Config directory** that holds both user settings and runtime data:
 
 ```
-<vault-root>/
-└── agents/<agent-name>/
-    ├── raw/
-    │   └── objectives.md     ← weekly + monthly + quarterly targets  (REQUIRED)
-    ├── log.md                ← chronological run log                  (REQUIRED)
-    └── wiki/
-        └── trends.md         ← streak counts + calibration history    (REQUIRED)
+<config-dir>/
+├── config.md        ← calendars, buffers, activity codes        (REQUIRED)
+├── objectives.md    ← weekly / monthly / quarterly targets      (REQUIRED)
+├── log.md           ← chronological run log (append-only)       (REQUIRED)
+├── trends.md        ← streak counts + calibration history       (REQUIRED)
+├── week-cache.md    ← GCal response cache (6h TTL, auto-managed)
+└── reports/
+    ├── weekly/      ← MODE A output reports
+    └── daily/       ← MODE B output reports
 ```
 
-The agent-name is typically `agenda-manager` or whatever the user calls their planning system.
-For new users it defaults to `time-coach`.
+**Standard single-vault layout (default for new users):** place all these files under `<vault-root>/agents/<agent-name>/` with `01-config/` for the two config files. The skill discovers this automatically.
 
-There may also be a `CLAUDE.md` at the vault root (or in the Claude project context) and a
-`runbook.md` alongside objectives.md — these mirror goal settings and should be kept in sync
-when goals change. Check for them before any write.
+**Split layout:** pass a `Config:` path explicitly (e.g., in a scheduled routine). The skill reads `config.md` and `objectives.md` from that path and writes runtime data (`log.md`, `trends.md`, `reports/`) to the same directory. No separate vault needed.
 
 **Week definition:** All blocks are created for Monday–Sunday (ISO 8601 week).
 - "Week of May 11" = May 11 (Monday) through May 17 (Sunday)
@@ -97,51 +96,63 @@ Attempt `mcp__claude_ai_Google_Calendar__list_calendars` with no arguments.
 - Success → set `gcal_available = true`. Cache the returned calendar list in session memory.
 - Any error (tool not found, permission denied, or any other error) → set `gcal_available = false`. Do not surface this to the user.
 
-**Token budget — GCal responses (CRITICAL):** After every `list_events` or `get_event` call, immediately extract only `{id, summary, start.dateTime, end.dateTime, colorId}` from the response. Discard all other fields before any processing. Use `agents/time-coach/scripts/filter_gcal.py` if available, otherwise extract inline.
+### Token Budget (all sessions)
 
-**Week cache check (before calling `list_events`):** Before any `list_events` call, check `02-exec/week-cache.md`. If it exists and is < 6 hours old, read it instead of calling the API. Otherwise call `list_events`, apply the GCal filter (above), and write a new cache.
+**§1 — GCal response filtering (critical):** After every `list_events` or `get_event` call, immediately extract only these 5 fields: `id`, `summary`, `start.dateTime`, `end.dateTime`, `colorId`. Discard all other fields (`htmlLink`, `organizer`, `creator`, `eventType`, `transparency`, `updated`, `created`, `status`, `iCalUID`, `sequence`, etc.) before any processing. Do not reference discarded fields in reasoning, output, or tool arguments. Use `scripts/filter_gcal.py` if available, otherwise extract inline. Token reduction: ~3× per fetch.
 
-After Step 1 locates the vault, also check for `<vault-root>/agents/<agent-name>/runbook.md` with a `§1 · Calendars` section:
-- Present with §1 → set `runbook_available = true`. Parse the Read+Write calendar ID from §1.
-- Absent or §1 missing → set `runbook_available = false`.
+**§2 — Week cache (read before fetching):** Before any `list_events` call, check `week-cache.md`. If it exists and its `generated:` timestamp is < 6 hours old, read it instead of calling the API. Otherwise call `list_events`, apply §1 filtering, write a new cache. Cache format:
+```
+# Week Cache — YYYY-MM-DD
+generated: YYYY-MM-DDTHH:MM:SS±HH:MM
 
-**Runbook calendar table check:** After detecting `runbook_available = true`, also run:
-- Parse `runbook.md § Config · Calendars` table
-- Extract all rows where `Role = "write"` 
-- If none found: set `write_calendar_configured = false`. (Will error during Calendar Write mode if triggered.)
-- If found exactly one: set `write_calendar_configured = true` and cache the `Calendar ID`
-- If multiple: set `write_calendar_ambiguous = true` (will ask user to choose during Calendar Write)
+## Claude Calendar Events
+| id | summary | start | end | color |
+|---|---|---|---|---|
+...
 
-Also read `objectives.md § Config` to get `review_cadence`, `sync_cadence`, `write_cadence`, `write_horizon`, `timezone`.
+## Personal Events (conflicts only)
+| summary | start | end |
+|---|---|---|
+...
+
+## Hours logged this week
+ACTIVITY: Xh / Yh goal | ...
+```
+
+**§3 — Config files read once:** Read `config.md` and `objectives.md` exactly once per session, at session start. After reading, hold a compact working state in memory: `activities [{code, priority, name, weekly_goal, window, duration, tracking}]`, `calendar_ids {personal, runna, claude}`, `buffer_rules`, `hard_window`. Do not re-read mid-session.
+
+**§4 — Response verbosity:** Weekly schedule (MODE A): write full table to `reports/weekly/YYYY-MM-DD_weekly.md`; respond in chat with ≤5 lines (totals + link only). GCal operation summaries: list created/updated/deleted counts, not individual entries. Config updates: confirm what changed in ≤3 lines, no full file echoes.
+
+**§5 — MODE A session isolation:** MODE A is a standalone scheduled task. After completing all calendar operations and writing `week-cache.md` and the weekly report: write a ≤3 line completion summary to chat, then end the task. User interaction picks up in a fresh session that reads `week-cache.md`. This prevents MODE A's ~30 tool call responses from persisting into the user's context.
+
+**Calendar write check:** From `config.md § Connected Calendars`, extract the row where `Role = "write"`:
+- Found exactly one → set `write_calendar_configured = true`, cache the `Calendar ID`
+- None found → set `write_calendar_configured = false` (will error if Calendar Write is triggered)
+- Multiple found → set `write_calendar_ambiguous = true` (will ask user to choose)
+
+Read `objectives.md § Config` to get `review_cadence`, `sync_cadence`, `write_cadence`, `write_horizon`, `timezone`.
 If `§ Config` is absent, use defaults: `review_cadence=7`, `sync_cadence=1`, `write_cadence=7`, `write_horizon=7`.
 
 ---
 
 ## Step 1 — Orient (always first)
 
-Before doing anything else, figure out where the vault lives:
+Resolve the **Config path** — the single directory that holds all user files:
 
-1. **Check context first.** Is there a CLAUDE.md, system prompt, or prior conversation that
-   names a vault path? If yes, confirm it: "I'll use `<path>` — is that right?"
-2. **Otherwise ask once:** "Where's your vault root? (e.g. `~/Documents/my-vault`)"
-   Also ask: "What's the agent folder called? (default: `agenda-manager`)"
+1. **Explicit path:** If `Config:` is provided in the routine or session context, use it directly.
+2. **Check context:** Look for a CLAUDE.md, system prompt, or prior conversation that names a config or vault path. Confirm: "I'll use `<path>` — is that right?"
+3. **Ask once:** "Where's your config directory? (e.g. `~/Documents/Claude/config/time-coach`)"
 
-**Legacy vault migration:** Before checking files, detect whether a vault migration is needed:
-1. Check `<vault-root>/agents/time-coach/` — if present, use it.
-2. Else check `<vault-root>/agents/agenda-manager/` — if present, offer once:
-   > "I found your vault at `agents/agenda-manager/`. Want me to rename it to `agents/time-coach/` to match the skill? (yes / keep as-is)"
-   - If yes: rename the folder, report `✅ Vault migrated to agents/time-coach/`, continue.
-   - If no: use `agents/agenda-manager/` for the session.
-3. If neither exists: go to **Onboarding** mode.
+**Standard single-vault layout (legacy):** If a vault root + agent name are provided instead of a Config path, resolve: `<vault>/agents/<agent-name>/` and look for `01-config/config.md`, `01-config/objectives.md`, `log.md`, `trends.md`, `reports/`.
 
-Then check which files exist at `<vault-root>/agents/<agent-name>/`:
+Check which required files exist at the Config path:
 - All present → continue to Step 1b
 - Some missing → offer onboarding for the missing ones, then continue
 - None present → go to **Onboarding** mode
 
 ### Step 1a — Config Files (read once)
 
-**Read exactly once at the start of Step 1:** Read `config.md` and `objectives.md`. Extract a compact working state (activities, calendar IDs, buffer rules). Reference this for the rest of the session — do not re-read.
+**Read exactly once at the start of Step 1:** Read `config.md` and `objectives.md` from the Config path. Extract a compact working state (activities, calendar IDs, buffer rules). Reference this for the rest of the session — do not re-read.
 
 **Calendar role mapping:** Extract the `Calendars` table from `runbook.md § Config`. Build a dict:
 ```python
@@ -324,7 +335,7 @@ P0 activities (meals, routines) are never in the scorecard. Only P1 and P2 appea
 ### Completion-tracked goals
 
 Some goals track progress toward a finish line rather than recurring hours. Detect these by
-checking the `Tracking` column in `objectives.md` §1 (see references/objectives-template.md).
+checking the `Tracking` column in `objectives.md` §1 (see templates/objectives-template.md).
 
 Tracking column values:
 - `hours` (or absent) — standard recurring-hours goal; no special handling
@@ -799,7 +810,7 @@ No file writes. Offer: "Want a full review, or run a calendar sync? (review / sy
 
 **Goal:** Run the daily calendar maintenance pass — deduplicate, resolve conflicts, prune met goals, create recovery blocks.
 
-**Requires:** `gcal_available = true` AND `runbook_available = true`. If either is false: "Calendar sync requires Google Calendar and a configured runbook.md. See `references/runbook-template.md` to set one up."
+**Requires:** `gcal_available = true` AND `runbook_available = true`. If either is false: "Calendar sync requires Google Calendar and a configured runbook.md. See `templates/runbook-template.md` to set one up."
 
 **Cadence gate:** Read the most recent `## YYYY-MM-DD · sync` or `## YYYY-MM-DD · daily` entry in `log.md`.
 If `today - last_sync_date < sync_cadence` days: "Last sync was [N] day(s) ago (cadence: [sync_cadence]). Running early — proceed anyway? (yes / no)"
@@ -954,18 +965,18 @@ After collecting activities and goals, offer:
 3. Also collect a duration per activity ("Typical block length? e.g. '2h', '30 min'") and write to the `Duration` column.
 4. Ask: "What's your timezone? (e.g. America/Mexico_City)"
 5. Ask: "Any buffer rules? (e.g. 'always 15 min before lunch', or Enter to use defaults)"
-6. Scaffold `runbook.md` from `references/runbook-template.md`, filling in §1 (calendars + timezone), §3 (buffer rules or defaults), §4 (`[VAULT]` placeholder). §2 is just the pointer line — no activity rows.
+6. Scaffold `runbook.md` from `templates/runbook-template.md`, filling in §1 (calendars + timezone), §3 (buffer rules or defaults), §4 (`[VAULT]` placeholder). §2 is just the pointer line — no activity rows.
 7. Add `runbook.md` to the files created list in the Finish output.
 
 **If skip:** Continue to file creation with no runbook.md. Skill operates in no-calendar mode.
 
 ### Create files
 
-**`raw/objectives.md`** — from `references/objectives-template.md`, filled with user's data.
+**`raw/objectives.md`** — from `templates/objectives-template.md`, filled with user's data.
 
-**`log.md`** — empty log with header from `references/log-template.md`.
+**`log.md`** — empty log with header from `templates/log-template.md`.
 
-**`wiki/trends.md`** — empty trends file with streak table from `references/trends-template.md`,
+**`wiki/trends.md`** — empty trends file with streak table from `templates/trends-template.md`,
 columns generated from the user's activity list.
 
 ### Finish
@@ -1063,7 +1074,7 @@ The vault structure is intentionally flexible:
 
 To publish: copy this directory to your GitHub repo. Users install via Cowork marketplace or by placing the folder in their skills directory.
 
-Reference templates for new-user onboarding live in `references/`:
+Reference templates for new-user onboarding live in `templates/`:
 - `objectives-template.md` — goals config including the `§ Config` cadence block
 - `runbook-template.md` — Google Calendar schedule rules (fill in for calendar integration)
 - `log-template.md`, `trends-template.md` — activity log and streak tracking starters

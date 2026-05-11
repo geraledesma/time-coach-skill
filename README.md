@@ -231,6 +231,35 @@ This version includes guardrails to prevent two common automation errors:
 
 These checks run automatically before any batch event creation and require user confirmation.
 
+## File Reference
+
+| File | Purpose | When to read |
+|------|---------|--------------|
+| `SKILL.md` | Complete skill spec: all modes, algorithms, guardrails, token budget | Every session (loaded by Claude Code) |
+| `runbook.md` | MODE A + MODE B step-by-step algorithms + conventions + edge cases | First run of each mode; troubleshooting |
+| `templates/config-template.md` | Blank user config — copy to `01-config/config.md` and fill in | Setup phase |
+| `templates/objectives-template.md` | Blank goals template | Setup phase |
+| `templates/runbook-template.md` | Calendar rules template | Optional; for multi-calendar users |
+| `templates/log-template.md` | Log format example | Setup phase |
+| `templates/trends-template.md` | Trends file starter | Setup phase |
+| `templates/weekly_report_template.md` | MODE A output structure | First review |
+| `templates/daily_report_template.md` | MODE B output structure | First review |
+| `scripts/validate_config.py` | Pre-flight config check | Before first MODE A |
+| `scripts/check_conflicts.py` | Conflict detection utility | Debugging |
+| `evals/` | Test cases | Development |
+
+**User config and runtime data (not in this repo):**
+
+| Path (relative to vault agent dir) | Purpose |
+|-------------------------------------|---------|
+| `01-config/config.md` | Your calendars, activities, buffers (fill from template) |
+| `01-config/objectives.md` | Your weekly/monthly/quarterly targets |
+| `log.md` | Append-only execution log |
+| `trends.md` | Streak counts + calibration history |
+| `week-cache.md` | GCal response cache (6h TTL, auto-managed) |
+| `reports/weekly/` | MODE A reports |
+| `reports/daily/` | MODE B reports |
+
 ## License
 
 MIT

@@ -2,7 +2,7 @@
 updated: 2026-05-01
 ---
 
-> **Purpose:** Algorithms and execution rules for time-coach. Covers MODE A (weekly write) and MODE B (daily sync). · **Read first:** 90-system/index.md · **Reference:** 01-config/config.md (your user settings)
+> **Purpose:** Algorithms and execution rules for time-coach. Covers MODE A (weekly write) and MODE B (daily sync). · **Read first:** runbook.md · **Reference:** 01-config/config.md (your user settings)
 
 # Time-Coach Runbook
 
@@ -86,7 +86,7 @@ For each gap identified in STEP 2:
 1. **Get goal hours from `01-config/objectives.md`** (weekly target for that activity)
 2. **Calculate catch-up from last week:**
    ```
-   last_week_actual = hours logged in 02-exec/log.md for that activity
+   last_week_actual = hours logged in log.md for that activity
    catch_up = max(0, weekly_goal − last_week_actual)
    allocation = weekly_goal + catch_up
    ```
@@ -147,7 +147,7 @@ Write all proposed blocks to Claude calendar in parallel.
 
 ---
 
-### STEP 7: WEEKLY REPORT (Write to `03-reports/weekly/YYYY-MM-DD_weekly.md`)
+### STEP 7: WEEKLY REPORT (Write to `reports/weekly/YYYY-MM-DD_weekly.md`)
 
 Create a markdown file with:
 
@@ -200,12 +200,12 @@ Create a markdown file with:
 
 ### STEP 8: UPDATE LOG & TRENDS
 
-**Append to `02-exec/log.md`:**
+**Append to `log.md`:**
 ```
 ## [2026-05-05] weekly | JS: 121% · EDH: 94% · CFA: 100% · MED: 4 ses · PROJ1: 100% · PROJ2: 75% · RUN: 3 ses · blocks: 18 created · conflicts: 1 escalated
 ```
 
-**Update `02-exec/trends.md`:**
+**Update `trends.md`:**
 - Update streak counts for each activity (✅ or 🔴)
 - Add new row to historical table if proposing a config change
 - Note any patterns or observations
@@ -336,7 +336,7 @@ Flag:
 
 ---
 
-### STEP 8: DAILY REPORT (Write to `03-reports/daily/YYYY-MM-DD_daily.md`)
+### STEP 8: DAILY REPORT (Write to `reports/daily/YYYY-MM-DD_daily.md`)
 
 Create a markdown file with:
 
@@ -376,7 +376,7 @@ Create a markdown file with:
 
 ### STEP 9: UPDATE LOG
 
-**Append one line to `02-exec/log.md`:**
+**Append one line to `log.md`:**
 ```
 ## [2026-05-06] daily | Changes: 3 · Conflicts: 2 · AT_RISK: 1 · EDHEC +1.5h recovery scheduled
 ```
@@ -451,7 +451,7 @@ This ensures you don't drift behind your annual targets while maintaining a stea
 - [ ] No buffer violations (45 min post-Runna, etc.)
 - [ ] Blocks are in preferred windows (or fallback if window full)
 - [ ] Weekly report shows allocations (base + catch-up if any)
-- [ ] Log entry appended to `02-exec/log.md`
+- [ ] Log entry appended to `log.md`
 
 **How to Know MODE B Worked:**
 - [ ] Conflicts detected and resolved without silent collisions
@@ -459,7 +459,7 @@ This ensures you don't drift behind your annual targets while maintaining a stea
 - [ ] MET_PRUNE deleted future blocks for completed activities
 - [ ] Horizon flags reflect actual remaining pace
 - [ ] Daily report shows all changes with reasons
-- [ ] Log entry appended to `02-exec/log.md`
+- [ ] Log entry appended to `log.md`
 
 ---
 
@@ -471,11 +471,132 @@ This ensures you don't drift behind your annual targets while maintaining a stea
 | Conflict not resolved | STEP 3: Was it P0-vs-Personal (immovable-vs-immovable)? Check for escalation flag. |
 | Same activity scheduled twice same day | STEP 2 (MODE B): DUPLICATE step should have merged them. Verify merge logic. |
 | Block moved to weird time | STEP 5: Preferred window was full. Check available slots 08:00–22:30. |
-| Weekly report missing | STEP 7: Check file path `03-reports/weekly/YYYY-MM-DD_weekly.md` exists. |
+| Weekly report missing | STEP 7: Check file path `reports/weekly/YYYY-MM-DD_weekly.md` exists. |
 
 ---
 
 **Last updated:** 2026-05-01  
 **Status:** Live, tested, integrated with 8 bug fixes from April–May 2026  
 **For:** Any user with 2+ calendars, 3+ concurrent activities, and immovable constraints (meals, routines)
+
+---
+
+## § Conventions
+
+### Activity Code Format
+
+**Pattern:** `ACTIVITY_SLUG` or `PROJ#-Name`
+
+**Examples:**
+```
+JOB_SEARCH       (work-related, generic)
+EDHEC            (education, short label)
+CFA              (certification program, short label)
+MEDITATION       (habit, generic)
+PROJ1-Bitcoin    (project, numbered with name)
+PROJ2-Bancos     (project, numbered with name)
+RUN              (exercise via app)
+GYM              (exercise, honor system)
+LECTURA          (hobby, short label)
+```
+
+**Rules:**
+- Uppercase alphanumeric + underscore/hyphen
+- No spaces (use hyphen or underscore)
+- Projects include number prefix (PROJ1, PROJ2, etc.)
+- Keep ≤20 characters total for readability
+- Match codes used in `01-config/config.md` Activity Codes table
+
+---
+
+### Log Entry Format
+
+**Location:** `log.md` (append-only — never edit or delete old entries)
+
+**Weekly Entry (MODE A):**
+```
+## [YYYY-MM-DD] weekly | ACT1: XX% · ACT2: XX% · ... · blocks: N created · conflicts: N escalated
+```
+
+**Daily Entry (MODE B):**
+```
+## [YYYY-MM-DD] daily | Changes: N · Conflicts: N · AT_RISK: M · [optional brief note]
+```
+
+---
+
+### Report Formats
+
+**Weekly report location:** `reports/weekly/YYYY-MM-DD_weekly.md`
+
+Required sections:
+1. Title: `# Weekly Report: Mon DD–Sun DD, YYYY`
+2. Bar chart (20-char scale) — Planned vs. Goal per activity
+3. Monthly Horizon — cumulative actuals vs. targets + remaining pace
+4. Trend Proposals — activities with ≥2-week streak of missing goal (omit if none)
+5. Gym Note — honor-system session count
+6. Outlook — 2–3 sentences on pace + one concrete suggestion
+
+Bar chart style:
+```
+💼 Job Search     [████████████░░] 12.1h / 10h (121%) ✅
+🎓 EDHEC          [██████░░░░░░░░]  7.5h /  8h  (94%) 🟡
+📊 CFA Level II   [████████░░░░░░]  6.0h /  6h (100%) ✅
+```
+Flags: ✅ ≥100% · 🟢 80–99% · 🟡 60–79% · 🔴 <60%
+
+**Daily report location:** `reports/daily/YYYY-MM-DD_daily.md`
+
+Required sections:
+1. Title: `# Daily Sync: Weekday, Mon DD, YYYY`
+2. Changes Made — bullet list of moves/creates/deletes with reasoning
+3. Bar chart — Actual so far vs. weekly goal
+4. Monthly Horizon — daily pacing snapshot
+5. Outlook — 1–2 sentences
+
+---
+
+### Calendar Event Names
+
+```
+💼 Job Search (1h on Mon)
+🎓 EDHEC Coursera (1.5h on Wed)
+📊 CFA Level II (3h on Thu)
+📚 Lectura (30 min on Wed)
+🏃 Running (Runna-managed — never create)
+🏋️ Gym (honor system — never create)
+```
+
+### File Naming
+
+- Weekly reports: `YYYY-MM-DD_weekly.md` (Monday start date)
+- Daily reports: `YYYY-MM-DD_daily.md` (calendar date)
+- Log: single file `log.md` (append-only)
+
+---
+
+### Edge Cases
+
+**Weekends:** P0 meals still required; P1 work on hold unless catch-up needed; P2 habits encouraged.
+
+**Honor system (gym):** Not in calendar. Track manually, confirm in weekly report. Account for 30–45 min post-gym recovery in scheduling.
+
+**App-managed exercise (e.g., Runna):** Never create exercise blocks. Respect pre-session (15 min) and post-session (45 min) buffers only.
+
+**Sleeping projects:** Do NOT create blocks, track actuals, or include in reports. Note in `01-config/objectives.md` why sleeping and when to reactivate.
+
+**Immovable conflict (P0 ↔ Personal):** Flag for user — do NOT proceed until clarified.
+
+---
+
+### Configuration Maintenance
+
+| When | Update |
+|------|--------|
+| New activity or name change | `01-config/config.md` Activity Codes table |
+| Window or buffer change | `01-config/config.md` |
+| Weekly goal change | `01-config/objectives.md` §1 + calibration note in §5 |
+| Monthly target change | `01-config/objectives.md` §2 |
+| After every MODE A run | `log.md` (weekly entry) + `trends.md` (streaks) |
+| After every MODE B run | `log.md` (daily entry) |
 

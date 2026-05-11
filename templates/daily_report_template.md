@@ -109,4 +109,4 @@ date: [YYYY-MM-DD]
 
 **Generated:** [TIME by time-coach agent]  
 **Mode:** MODE B (Daily Sync)  
-**Log entry:** Update `/02-exec/log.md` with one-line summary after report
+**Log entry:** Update `/log.md` with one-line summary after report

@@ -114,16 +114,13 @@ Define your fixed daily routine blocks:
 
 ## Notes for First Run
 
-- Copy this file: `cp 90-system/config.template.md 01-config/config.md`
-- Fill in all [FILL IN] fields
-- Delete this instruction note when done
-- Create `01-config/objectives.md` with your weekly/monthly targets
-- Create `02-exec/` and `03-reports/` directories
+- Copy this file to `01-config/config.md` and fill in all [FILL IN] fields
+- Create `01-config/objectives.md` with your weekly/monthly targets (use `templates/objectives-template.md`)
+- Create `runtime/` and `reports/weekly/` and `reports/daily/` directories
 - Run: `python scripts/validate_config.py 01-config/config.md`
-- Follow `90-system/runbook.md` § MODE A to run your first week
+- Follow `runbook.md` § MODE A to run your first week
 
 ---
 
 **Template Version:** 2026-05-01  
 **For:** New users getting started with time-coach
-

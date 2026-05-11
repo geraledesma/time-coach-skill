@@ -96,4 +96,4 @@ If yes, show trend proposal:
 
 **Generated:** [DATETIME by time-coach agent]  
 **Mode:** MODE A (Weekly Planning)  
-**Read with:** `90-system/runbook.md` § MODE A, `02-exec/trends.md`
+**Read with:** `runbook.md` § MODE A, `trends.md`
