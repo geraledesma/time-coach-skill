@@ -47,6 +47,13 @@ There may also be a `CLAUDE.md` at the vault root (or in the Claude project cont
 `runbook.md` alongside objectives.md — these mirror goal settings and should be kept in sync
 when goals change. Check for them before any write.
 
+**Week definition:** All blocks are created for Monday–Sunday (ISO 8601 week).
+- "Week of May 11" = May 11 (Monday) through May 17 (Sunday)
+- "Week of May 12" = error: May 12 is Tuesday. Did you mean May 11–17?
+- If the user's timezone doesn't align with UTC Monday (rare), adjust the calculation to their local midnight.
+
+**Calendar configuration:** The `runbook.md § Config · Calendars` table must include a row where `Role = "write"`. During Calendar Write mode, this calendar ID is validated before any batch event creation.
+
 ---
 
 ## Activity Types
@@ -98,6 +105,13 @@ After Step 1 locates the vault, also check for `<vault-root>/agents/<agent-name>
 - Present with §1 → set `runbook_available = true`. Parse the Read+Write calendar ID from §1.
 - Absent or §1 missing → set `runbook_available = false`.
 
+**Runbook calendar table check:** After detecting `runbook_available = true`, also run:
+- Parse `runbook.md § Config · Calendars` table
+- Extract all rows where `Role = "write"` 
+- If none found: set `write_calendar_configured = false`. (Will error during Calendar Write mode if triggered.)
+- If found exactly one: set `write_calendar_configured = true` and cache the `Calendar ID`
+- If multiple: set `write_calendar_ambiguous = true` (will ask user to choose during Calendar Write)
+
 Also read `objectives.md § Config` to get `review_cadence`, `sync_cadence`, `write_cadence`, `write_horizon`, `timezone`.
 If `§ Config` is absent, use defaults: `review_cadence=7`, `sync_cadence=1`, `write_cadence=7`, `write_horizon=7`.
 
@@ -128,6 +142,18 @@ Then check which files exist at `<vault-root>/agents/<agent-name>/`:
 ### Step 1a — Config Files (read once)
 
 **Read exactly once at the start of Step 1:** Read `config.md` and `objectives.md`. Extract a compact working state (activities, calendar IDs, buffer rules). Reference this for the rest of the session — do not re-read.
+
+**Calendar role mapping:** Extract the `Calendars` table from `runbook.md § Config`. Build a dict:
+```python
+write_calendar_id = None
+manual_calendar_id = None
+for row in runbook_calendars_table:
+    if row['Role'] == 'write':
+        write_calendar_id = row['Calendar ID']
+    elif row['Role'] == 'manual':
+        manual_calendar_id = row['Calendar ID']
+```
+This ensures the skill **never assumes** which calendar to write to.
 
 ### Step 1b — Proactive check-in (before routing)
 
@@ -538,6 +564,10 @@ Activity           Suggested   Window             Days
 - Session-only / `DO NOT create blocks` activities: show window source (e.g. "[App]-owned") and `—` for days.
 - Window-sharing rules (e.g. competing P2 projects): reproduce the note from the text block below the §1 table.
 
+**WEEK BOUNDARY CHECK (when planning "next week"):**
+- If today is Mon–Sun: next week = Monday of the following week
+- Confirm with user: "Planning for week of [next_monday] (Mon–Sun)?"
+
 ### § Create Calendar Blocks (runs if `gcal_available = true`)
 
 After the schedule suggestions, offer:
@@ -835,6 +865,34 @@ Offer to write to `reports/YYYY-MM-DD_daily.md`.
 **Cadence gate:** Read the most recent `## YYYY-MM-DD · write` entry in `log.md`.
 If `today - last_write_date < write_cadence` days: warn and ask to confirm before proceeding.
 
+**CALENDAR VALIDATION (new — runs before CREATE SKELETON):**
+Before creating any events:
+1. Read `runbook.md § Config · Calendars table`
+2. Identify the row where `Role = "write"` (or `Role = "Write +"`)
+3. Extract `Calendar Name` (e.g. "Claude") and `Calendar ID`
+4. **Gate:** If no write calendar is found, error: "No write-designated calendar in runbook.md. Add a row with Role='write' and rerun."
+5. **Gate:** If multiple write calendars exist (edge case), ask: "Found [N] write calendars — which one should I use?" (select by name)
+6. Cache this calendar ID for all subsequent `create_event` calls in this session
+
+**Week Boundary Validation (new — runs before CREATE SKELETON):**
+Before creating any events:
+1. Parse the user's request for a date or range (e.g. "May 11 week", "next week", "May 12-18")
+2. If a specific range is given (e.g. "May 12-18"), check the day-of-week for the start date:
+   - If start_date is NOT a Monday: **error.** "May 12 is a Tuesday. Did you mean May 11–17 (the week starting Monday)? Please clarify the week."
+   - If start_date IS a Monday: confirm "Creating blocks for week of [start_date] (Mon–Sun). Sound right?"
+3. If no specific range (e.g. "next week" or "this week"), compute:
+   ```
+   today_weekday = WEEKDAY(today)  // Monday=0, Sunday=6
+   if today_weekday == 0:  // Today is Monday
+       week_start = today
+   else:
+       week_start = today - today_weekday  // Go back to most recent Monday
+   week_end = week_start + 6  // Sunday
+   ```
+   Report: "Week of [week_start] (Monday) through [week_end] (Sunday). Creating blocks for [calendar days in this window]?"
+4. Get user confirmation before proceeding.
+5. Proceed only if week_end - week_start == 6 days.
+
 **FETCH:** Write calendar · today through today + `write_horizon` days.
 
 **CREATE SKELETON** (gaps only, P0 → P1 → P2):
@@ -924,6 +982,52 @@ Files created:
 
 Run /time-coach again and say "review" to start tracking.
 [If runbook.md was created: "During review, I'll read your actuals directly from Google Calendar."]
+```
+
+---
+
+## Error Messages
+
+### Calendar Assignment Error:
+```
+❌ No write-designated calendar found.
+
+I need a calendar marked with Role='write' in your runbook.md.
+Add a row to § Config · Calendars with:
+  Role: write
+  Calendar Name: [your label, e.g. "Work Automation"]
+  Calendar ID: [from Google Calendar settings]
+  Access: Read+Write
+
+Then rerun "calendar write".
+```
+
+### Week Boundary Error:
+```
+⚠️  Week start mismatch.
+
+You asked for "May 12 week," but May 12 is a Tuesday.
+Did you mean May 11–17 (the week starting Monday)?
+
+Please clarify:
+- "May 11 week" (Mon–Sun) ✓
+- "next week" (auto-detect) ✓
+- "May 12–18" (I'll flag this as non-standard)
+```
+
+### Write Calendar Permission Error:
+```
+❌ Cannot write to calendar "[Calendar Name]".
+
+Possible causes:
+1. The calendar is read-only in Google Calendar settings
+2. Google Calendar MCP lost auth (try: "run sync" to re-authenticate)
+3. The calendar is shared/group and has restricted permissions
+
+Fix:
+- Ensure the calendar ID in runbook.md matches a calendar with Write access
+- Check Google Calendar settings: that calendar should show "Edit events" permission
+- Retry after confirming permissions
 ```
 
 ---

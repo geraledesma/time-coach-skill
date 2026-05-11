@@ -209,6 +209,28 @@ Evals are in `evals/evals.json`. Run them with the Claude Code Cowork skill-crea
 python3 -m scripts.eval_runner /path/to/time-coach/evals/evals.json
 ```
 
+## For GitHub / Cowork marketplace publishing
+
+This skill has **no required external MCP dependencies**. Google Calendar integration is optional and auto-detected at session start. Without it, the skill reads and writes plain `.md` files only.
+
+The vault structure is intentionally flexible:
+- Activity names and emojis are read from `objectives.md` — not hardcoded
+- Log format is structured key-value — LLM-parseable and human-readable
+- Review cadence, sync cadence, and calendar write horizon are all user-configurable via `objectives.md § Config`
+
+**Coworks scheduled triggers:** Point a daily trigger and a weekly trigger at this skill. The skill's internal cadence gates (`sync_cadence`, `write_cadence` in `§ Config`) control whether each run actually executes — Coworks frequency does not need to change when you adjust cadences.
+
+**Deprecates:** `agenda-manager` and `agenda-companion` skills. If migrating, re-point existing Coworks scheduled triggers from those skills to `time-coach` with context hints "run calendar sync" (daily) and "run calendar write" (weekly/Sunday).
+
+### Calendar Assignment & Week Boundary Safeguards (v1.1+)
+
+This version includes guardrails to prevent two common automation errors:
+
+1. **Calendar assignment:** Validates that events are written to the correct (write-designated) calendar, not the user's personal/manual calendar.
+2. **Week boundary:** Enforces Monday–Sunday weeks. Rejects non-standard week ranges and auto-detects the correct week from "next week" or "this week" requests.
+
+These checks run automatically before any batch event creation and require user confirmation.
+
 ## License
 
 MIT

@@ -26,15 +26,29 @@ updated: [YYYY-MM-DD]
 
 User: [Your Name] · [your.email@gmail.com] · Timezone: [Region/City]
 
-| Role         | Calendar ID                                      | Access     |
-|--------------|--------------------------------------------------|------------|
-| Personal     | [your.email@gmail.com]                           | Read-only  |
-| [App/Team]   | [hash@group.calendar.google.com]                 | Read-only  |
-| [Time Blocks]| [hash@group.calendar.google.com]                 | Read+Write |
+### § Config · Calendars
+
+| Role | Calendar Name | Calendar ID | Access |
+|---|---|---|---|
+| write | [Your label, e.g. "Time Blocks"] | [User fills in] | Read+Write |
+| manual | [Your label, e.g. "Personal"] | [User fills in] | Read-only |
+| read-only | [Your label, e.g. "Fitness Tracker"] | [User fills in] | Read-only |
+
+**How to find your Calendar ID:**
+1. Go to Google Calendar → Settings (⚙️ gear icon)
+2. In the left sidebar, click on the calendar name
+3. Scroll down to "Integrate calendar"
+4. Copy the Calendar ID (looks like: `yourname@gmail.com` or `abc123...@group.calendar.google.com`)
+5. Paste it into the "Calendar ID" column above
+
+**Role definitions:**
+- **write**: The calendar where time-coach will create scheduling blocks (must have Read+Write access)
+- **manual**: Reserved for calendars you manage manually (read-only from time-coach's perspective)
+- **read-only**: Shared or external calendars that time-coach reads to check for conflicts
 
 <!--
-  The Read+Write calendar is the only one time-coach writes to.
-  Personal and Read-only calendars are read when checking for conflicts (§2 conflict rules)
+  The Read+Write calendar (Role="write") is the only one time-coach writes to.
+  Manual and Read-only calendars are read when checking for conflicts (§2 conflict rules)
   and when reading session-based activity actuals (e.g. fitness app blocks).
 -->
 
